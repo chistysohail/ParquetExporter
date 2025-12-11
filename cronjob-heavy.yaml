@@ -1,0 +1,55 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: parquet-exporter-weekly
+  namespace: data-jobs
+spec:
+  schedule: "0 2 * * 0"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: parquet-exporter
+        spec:
+          nodeSelector:
+            nodepool: batch-heavy
+          restartPolicy: Never
+          containers:
+            - name: parquet-exporter
+              image: myacr.azurecr.io/parquet-exporter:1.0.0
+              imagePullPolicy: IfNotPresent
+              resources:
+                requests:
+                  cpu: "4"
+                  memory: "16Gi"
+                limits:
+                  cpu: "8"
+                  memory: "32Gi"
+              env:
+                - name: DOTNET_ENVIRONMENT
+                  value: "Production"
+                - name: SQL_CONNECTION_STRING
+                  valueFrom:
+                    secretKeyRef:
+                      name: parquet-exporter-secrets
+                      key: SQL_CONNECTION_STRING
+                - name: BLOB_CONNECTION_STRING
+                  valueFrom:
+                    secretKeyRef:
+                      name: parquet-exporter-secrets
+                      key: BLOB_CONNECTION_STRING
+              volumeMounts:
+                - name: appsettings-volume
+                  mountPath: /app/config/Production
+                  readOnly: true
+          volumes:
+            - name: appsettings-volume
+              configMap:
+                name: parquet-exporter-config
+                items:
+                  - key: appsettings.json
+                    path: appsettings.json
